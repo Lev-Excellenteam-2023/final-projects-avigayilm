@@ -105,8 +105,8 @@ reads the powerpoint
 '''
 def read_powerpoint(pPname):
     # Load PowerPoint presentation
-    presentation = Presentation(pPname + '.pptx')
-    #presentation=Presentation(pPname)
+    #presentation = Presentation(pPname + '.pptx')
+    presentation=Presentation(pPname)
 
     # Get the filename without the directory path
     filename = os.path.basename(pPname)

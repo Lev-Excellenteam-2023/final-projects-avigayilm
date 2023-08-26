@@ -5,8 +5,9 @@ import openai
 import json
 import asyncio
 
-#api_key = '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' for excellentim
-API_KEY= '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' #excellentim tal
+api_key = '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' #for excellentim
+#API_KEY= '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' #excellentim tal
+API_KEY= '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' #excellentim tal
 
 # set the behaviour of the system
 messages = [
