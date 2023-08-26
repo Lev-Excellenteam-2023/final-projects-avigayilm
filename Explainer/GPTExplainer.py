@@ -20,6 +20,9 @@ slide_explanation=[]
 openai.api_key = API_KEY
 
 
+'''
+gets response from chatgpt
+'''
 def sendToChatGPT(explanation_data, slide_dict_info,slide_number):
 
     print(slide_dict_info)
