@@ -100,6 +100,9 @@ def Add_Info_Slide():
     return additional_info_dict
 
 
+'''
+reads the powerpoint
+'''
 def read_powerpoint(pPname):
     # Load PowerPoint presentation
     presentation = Presentation(pPname + '.pptx')
