@@ -27,9 +27,12 @@ class UploadClient:
         else:
             response.raise_for_status()
 
-    def status(self, uid):
+    def status(self, uid, email=None):
         status_url = f"{self.base_url}/status"
         params = {'uid': uid}
+        # allow to add email
+        if email:
+            params['email'] = email
         response = requests.get(status_url, params=params)
         response_data = response.json()
 

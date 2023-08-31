@@ -17,6 +17,8 @@ def main():
 @app.route('/upload', methods=['POST'])
 def upload():
     f = request.files['file']
+    email_addr = request.form['email']
+    print(email_addr)
 
     # Check if the uploaded file is a PowerPoint file
     allowed_extensions = {'ppt', 'pptx'}
@@ -51,10 +53,37 @@ def upload():
     # Save the file to the upload folder with the new filename
     f.save(os.path.join(upload_folder, new_filename))
 
+
+    # save the file and user in the database
+
+    user=None
+    #check if an email was provided
+    if email_addr:
+        # Query the User table for the given email
+        user = session.query(User).filter_by(email=email_addr).first()
+        if not user:
+            #if the user doesn't exist yet, create a new user
+            user=User(email=email_addr)
+            session.add(user)
+
+
+    new_upload = Upload(
+        uid=unique_uid,
+        filename=filename_without_extension,
+        upload_time=timestamp,
+        status="pending",
+        user=user
+    )
+    session.add(new_upload)
+
+    # Commit the changes
+    session.commit()
+    # Close the session when done
+    session.close()
+
     # Create a JSON response with the UID
     response = {'uid': unique_uid}
-    return jsonify(response)
-    #return render_template("success.html", message=unique_uid)
+    return jsonify(response),200
 
 
 def extract_filename_components(filename):
@@ -77,9 +106,10 @@ def extract_filename_components(filename):
 def status():
     if request.method == 'GET':
         uid = request.args.get('uid')  # Get the UID from the URL parameter
+        email = request.args.get("email")
 
         # Check if the UID is in the uploads folder
-        upload_folder = r'C:\Users\aviga\Documents\Ofek\Year 3\semester 2\Excelentim\pythonProject\FlaskApplication\uploads'
+        upload_folder = r'C:\Users\aviga\Documents\Ofek\Year 3\semester 2\Excelentim\pythonProject\final_prodj\final-projects-avigayilm\uploads'
         file_extension = "pptx"  # Replace with the expected file extension
 
         # Construct the UID pattern with the wildcard
@@ -89,55 +119,114 @@ def status():
         matching_files = glob.glob(os.path.join(upload_folder, uid_pattern))
 
 
-        if not matching_files:
-            # UID not found in uploads folder, return 'not found'
-            response_data = {
-                'status': 'not found',
-                'filename': None,
-                'timestamp': None,
-                'explanation': None
-            }
-            return jsonify(response_data), 404
+        # if not matching_files:
+        #     # UID not found in uploads folder, return 'not found'
+        #     response_data = {
+        #         'status': 'not found',
+        #         'filename': None,
+        #         'timestamp': None,
+        #         'explanation': None
+        #     }
+        #     return jsonify(response_data), 404
 
-        # Assuming there's only one matching file (or you can handle multiple matches as needed)
-        matching_file_path = matching_files[0]
+        # Query the Upload model to find the matching record
+        if uid:
+            upload = Upload.query.filter_by(uid=uid).first()
 
-        # Extract the filename from the path
-        filename = os.path.basename(matching_file_path)
-
-        # Extract components using the function
-        original_filename, timestamp_datetime, file_extension = extract_filename_components(filename)
-
-
-        # Check if an explanation JSON file exists in the outputs folder with the given UID
-        output_folder = r'C:\Users\aviga\Documents\Ofek\Year 3\semester 2\Excelentim\pythonProject\FlaskApplication\outputs'
-        # Construct the UID pattern with the wildcard
-        uid_pattern = f"*_{uid}.json"
+            if upload is None:
+                # UID not found in the database, return 'not found'
+                response_data = {
+                    'status': 'not found',
+                    'filename': None,
+                    'timestamp': None,
+                    'explanation': None
+                }
+                return jsonify(response_data), 404
 
 
-        # Search for files matching the UID pattern in the uploads folder
-        matched_files = glob.glob(os.path.join(output_folder, uid_pattern))
 
-        if not matched_files:
-            # Explanation not found in outputs folder, return 'pending'
-            response_data = {
-                'status': 'pending',
-                'filename': original_filename,
-                'timestamp': timestamp_datetime,
-                'explanation': None
-            }
-            return jsonify(response_data),200
+            # # Assuming there's only one matching file (or you can handle multiple matches as needed)
+            # matching_file_path = matching_files[0]
+            #
+            # # Extract the filename from the path
+            # filename = os.path.basename(matching_file_path)
+            #
+            # # Extract components using the function
+            # original_filename, timestamp_datetime, file_extension = extract_filename_components(filename)
 
-        with open(matching_files[0], 'r') as json_file:
-            json_data = json.load(json_file)
-            response_data = {
-                'status': 'pending',
-                'filename': original_filename,
-                'timestamp': timestamp_datetime,
-                'explanation': None
-            }
+            original_filename = upload.filename
+            timestamp_datetime = upload.upload_time
 
-        return jsonify(response_data),200
+
+            # Check if an explanation JSON file exists in the outputs folder with the given UID
+            output_folder = r'C:\Users\aviga\Documents\Ofek\Year 3\semester 2\Excelentim\pythonProject\FlaskApplication\outputs'
+            # Construct the UID pattern with the wildcard
+            uid_pattern = f"*_{uid}.json"
+
+
+            # Search for files matching the UID pattern in the uploads folder
+            matched_files = glob.glob(os.path.join(output_folder, uid_pattern))
+
+            if not matched_files:
+                # Explanation not found in outputs folder, return 'pending'
+                response_data = {
+                    'status': 'pending',
+                    'filename': original_filename,
+                    'timestamp': timestamp_datetime,
+                    'explanation': None
+                }
+                return jsonify(response_data),200
+
+            with open(matching_files[0], 'r') as json_file:
+                json_data = json.load(json_file)
+                response_data = {
+                    'status': 'done',
+                    'filename': original_filename,
+                    'timestamp': timestamp_datetime,
+                    'explanation': json_data
+                }
+
+                return jsonify(response_data),200
+        elif email:
+            user = session.query(User).filter_by(email=email).first()
+            if user:
+                upload = session.query(Upload).filter_by(user=user).order_by(
+                    Upload.upload_time.desc()).first()
+                timestamp=datetime.fromtimestamp(upload.upload_time)
+                filename=upload.filename
+                uid=upload.uid
+
+                # Check if an explanation JSON file exists in the outputs folder with the given UID
+                output_folder = r'C:\Users\aviga\Documents\Ofek\Year 3\semester 2\Excelentim\pythonProject\FlaskApplication\outputs'
+                # Construct the UID pattern with the wildcard
+                uid_pattern = f"*_{uid}.json"
+
+                # Search for files matching the UID pattern in the uploads folder
+                matched_files = glob.glob(os.path.join(output_folder, uid_pattern))
+
+                if not matched_files:
+                    # Explanation not found in outputs folder, return 'pending'
+                    response_data = {
+                        'status': 'pending',
+                        'filename': original_filename,
+                        'timestamp': timestamp_datetime,
+                        'explanation': None
+                    }
+                    return jsonify(response_data), 200
+
+                with open(matching_files[0], 'r') as json_file:
+                    json_data = json.load(json_file)
+                    response_data = {
+                        'status': 'done',
+                        'filename': original_filename,
+                        'timestamp': timestamp_datetime,
+                        'explanation': json_data
+                    }
+
+                    return jsonify(response_data), 200
+
+        else:
+            return jsonify({"error": "There was no uid or email provided"}), 400
 
 
 
